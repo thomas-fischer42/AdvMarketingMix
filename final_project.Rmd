@@ -1,0 +1,34 @@
+---
+title: "Untitled"
+author: "Thomas Fischer"
+date: "14 11 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("code/01_dependencies.R")
+source("code/02_functions.R")
+source("code/03_processing.R")
+source("code/04_brandchoice.R")
+source("code/05_incidence.R")
+source("code/06_quantity.R")
+source("code/07_combined.R")
+source("code/08_segments.R")
+```
+
+
+```{r}
+getStorePrices(kaffee) %>%
+	tidyr::pivot_longer(cols = ends_with("Price"), names_to = "Brand", values_to = "Price") %>% 
+	drop_duplicates() %>% 
+	ggplot() + 
+	geom_smooth(aes(x = Days, y = Price, group = Brand, col = Brand))
+```
+
+
+```{r}
+getPurchaseVolume(kaffee) %>% 
+	ggplot() + 
+	geom_smooth(aes(x = Days, y = Units, group = Brand, col = Brand), se = FALSE)
+```
