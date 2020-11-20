@@ -9,10 +9,21 @@ reorganizePars.brandchoice <- function(pars) {
 
 brandChoiceModel <- function(data) {
 	
-	likelihood <- function(pars, return.model=TRUE) {
-		
+	unique_id <- unique(kaffee2$ID)
+
+	# Pre-initialize containers ----
+	utility             <- matrix(0, nrow = rows, ncol = brands)
+	logprob_brandchoice <- matrix(0, nrow = rows, ncol = brands)
+	cv                  <- numeric(rows)
+	loglik              <- numeric(rows)
+	
+	# Add names to containers ----
+	colnames(logprob_brandchoice) <- paste(brand_names, "LP_BCH", sep = "_")
+	
+	likelihood <- function(pars, return.data=TRUE) {
 		mat <- as.matrix(data)
 		pars <- reorganizePars.brandchoice(pars)
+		
 		for (id in unique_id) {
 			index <- which(mat[,"ID"] == id)
 			
@@ -21,17 +32,21 @@ brandChoiceModel <- function(data) {
 				utility[index,p] <- (pars[["Intercept"]] + pars[["Brand_Intercept"]][p] + mat[index, predictors] %*% pars[["Covariates"]])
 			}
 		}
-		cv <- rowSums(exp(utility))
-		logprob_brandchoice <- utility - log(cv)
+		
+		cv <- log(rowSums(exp(utility)))
+		logprob_brandchoice <- log(exp(utility)/exp(cv))
 		loglik <- rowSums(logprob_brandchoice * mat[, brand_names])
-		data <- data.frame(data, CV = cv, LL_BCH = loglik)
-		if (return.model) return(data)
-		return(-sum(loglik))
+		LL <- sum(loglik)
+		
+		if (return.data) {
+			data <- data.frame(data, CV = cv, LL_BCH = loglik)
+			return(data)
+		}
+		
+		if (is.nan(LL)) stop("Brandchoice model yielded NAN loglikelihood")
+		if (is.infinite(LL)) LL <- -1e100
+		
+		return(-LL)
 	}
 	return(likelihood)
 }
-# 
-# res <- optim(rep(0, 11), fn = brandChoiceModel(kaffee), return.model=FALSE, control = list(maxit = 1e3))
-# 
-# tmp <- brandChoiceModel(kaffee)
-# tmp(rep(0, 11))

@@ -7,23 +7,36 @@ reorganizePars.incidence <- function(pars) {
 
 incidenceModel <- function(data) {
 	
-	likelihood <- function(pars, return.model=TRUE) {
+	unique_id <- unique(kaffee2$ID)
+	# Pre-initialize containers ----
+	linpred             <- numeric(rows)
+	logprob_purchase    <- numeric(rows)
+	loglik              <- numeric(rows)
+	
+
+	likelihood <- function(pars, return.data = TRUE) {
 		
 		mat <- as.matrix(data)
 		pars <- reorganizePars.incidence(pars)
 		
 		for (id in unique_id) {
 			index <- which(mat[,"ID"] == id)
-			
 			predictors <- c("CR", "Inventory", "CV")
-			linpred <- pars[["Intercept"]] + mat[index, predictors] %*% pars[["Covariates"]]
-			logprob_purchase[index] <- -log(1 + exp(-linpred))
+			linpred[index] <- pars[["Intercept"]] + mat[index, predictors] %*% pars[["Covariates"]]
 		}
-		loglik <- logprob_purchase * rowSums(mat[, brand_names]) + log(1-exp(logprob_purchase)) * (1-rowSums(mat[, brand_names]))
-		data <- data.frame(data, LL_PUR = loglik)
 		
-		if (return.model) return(data)
-		return(-sum(loglik))
+		logprob_purchase <- log(expit(linpred))
+		loglik <- dbinom(rowSums(mat[, brand_names]), 1, exp(logprob_purchase), log = TRUE)
+		LL <- sum(loglik)
+
+		if (return.data) {
+			data <- data.frame(data, LL_PUR = loglik)
+			return(data)
+		}
+		
+		if (is.nan(LL)) stop("Incidence model yielded NAN loglikelihood")
+		if (is.infinite(LL)) LL <- -1e100
+		return(-LL)
 	}
 	return(likelihood)
 }

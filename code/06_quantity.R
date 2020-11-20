@@ -8,7 +8,18 @@ reorganizePars.quantity <- function(pars) {
 
 quantityModel <- function(data) {
 	
-	likelihood <- function(pars, return.model = TRUE) {
+	unique_id <- unique(kaffee2$ID)
+	
+	# Pre-initialize containers ----
+	linpred             <- matrix(0,  nrow = rows, ncol = brands)
+	lambda              <- matrix(0, nrow = rows, ncol = brands)
+	logprob_quantity    <- matrix(0, nrow = rows, ncol = brands)
+	loglik              <- numeric(rows)
+	
+	# Add names to containers ----
+	colnames(logprob_quantity) <- paste(brand_names, "LP_QTY", sep = "_")
+
+	likelihood <- function(pars, return.data = TRUE) {
 		
 		mat <- as.matrix(data)
 		pars <- reorganizePars.quantity(pars)
@@ -18,20 +29,26 @@ quantityModel <- function(data) {
 			
 			for (p in 1:brands) {
 				predictors <- c("PR", "Inventory", paste(brand_names[p], c("Loyalty", "Price", "Pricecut"), sep = "_"))
-				linpred <- pars[["Intercept"]] + pars[["Brand_Intercept"]][p] + mat[index, predictors] %*% pars[["Covariates"]]
-				lambda[index, p] <- exp(linpred)
+				linpred[index, p] <- pars[["Intercept"]] + pars[["Brand_Intercept"]][p] + mat[index, predictors] %*% pars[["Covariates"]]
 			}
 		}
+		
+		lambda <- exp(linpred)
 		logprob_quantity <- log(dtruncpois(lambda, mat[, "Purchase_Quantity"]))
-		loglik <- rowSums(logprob_quantity * mat[, brand_names])
-		data <- data.frame(data, LL_QTY = loglik)
-		if (return.model) return(data)
-		return(-sum(loglik))
+		loglik <- rowSums(logprob_quantity * mat[, brand_names], na.rm = TRUE)
+		loglik[is.nan(loglik)] <- 0 # log(0) * 0
+		
+		LL <- sum(loglik)
+		
+		if (return.data) {
+			data <- data.frame(data, LL_QTY = loglik)
+			return(data)
+		}
+		
+		if (is.nan(LL)) stop("Quantity model yielded NAN loglikelihood")
+		if (is.infinite(LL)) LL <- -1e100
+		return(-LL)
 	}
 	return(likelihood)
 }
 
-# res <- optim(rep(0, 12), fn = quantityModel(kaffee), return.model=FALSE, control = list(maxit = 1e4))
-
-# tmp <- quantityModel(kaffee)
-# test <- tmp(rep(0, 12))

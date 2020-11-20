@@ -1,4 +1,14 @@
-
+## ---------------------------
+##
+## Script name: 02_functions.R
+##
+## Purpose of script: Initialize custom functions
+##
+## Author: Thomas Fischer
+##
+## Date Created: 2020-11-16
+##
+## ---------------------------
 
 
 # Variable transformation ----
@@ -13,19 +23,6 @@ expit <- function(x) {
 
 dtruncpois <- function(lambda, quantity) {
 	exp(-lambda) * lambda^quantity / ((1-exp(-lambda))*factorial(quantity))
-}
-
-
-
-# Data wrangling ----
-
-drop_duplicates <- function(data) {
-	return(data[!duplicated(data), ])
-}
-
-reshapePurchasedBrand <- function(data) {
-	brand_purchases[cbind(1:rows, data$Purchase_Brand + 1)] <- 1
-	return(data.frame(data, brand_purchases[, -1]))
 }
 
 getStorePrices <- function(data, id = NULL) {
@@ -48,9 +45,27 @@ getPurchaseVolume <- function(data) {
 		ungroup()
 }
 
+# Data wrangling ----
+
+drop_duplicates <- function(data) {
+	return(data[!duplicated(data), ])
+}
+
+reshapePurchasedBrand <- function(data) {
+	rows <- nrow(data)
+	brand_purchases <- matrix(0,  nrow = rows, ncol = brands + 1)
+	colnames(brand_purchases) <- c("None", brand_names)
+	brand_purchases[cbind(1:rows, data$Purchase_Brand + 1)] <- 1
+	return(data.frame(data, brand_purchases[, -1]))
+}
+
+
+
 # Inventory and Consumption ----
 
 averagePurchaseQty <- function(data) {
+	rows <- nrow(data)
+	avg_qty             <- numeric(rows)
 	purch <- which(data$Purchase_Quantity > 0)	
 	
 	for (id in unique(data$ID)) {
@@ -71,51 +86,38 @@ checkNewDay <- function(Days) {
 }
 
 estimateInventory <- function(data) {
+	rows <- nrow(data)
+	Inventory <- numeric(rows)
 	
 	CR <- estimateConsumptionRate(data$Days, data$Purchase_Quantity)
-	Consumption <- CR * checkNewDay(data$Days)
+	Consumption <- CR * (data$Days - lag(data$Days, default = 0))
 	
 	for (i in 2:rows) {
-		Inventory[i] <- Inventory[i-1] + data$Purchase_Quantity[i-1] - Consumption[i-1]
-		
-		# Ensure that Consumption does not exceed Inventory on day i
-		Consumption[i] <- min(Inventory[i], Consumption[i])
+		Inventory[i] <- max(0, Inventory[i-1] + data$Purchase_Quantity[i-1] - Consumption[i-1])
 	}
 	
 	return(data.frame(data, CR = CR, Consumption = Consumption, Inventory = Inventory))
 }
 
-# Brand loyalty ----
-
-# estimateBrandLoyalty <- function(data) {
-# 	rows <- nrow(data)
-# 	
-# 	brand_purchases <- apply(data[,brand_names], 2, cumsum)
-# 	category_purchases <- rowSums(brand_purchases)
-# 	
-# 	brand_loyalty <- matrix(0, nrow = rows, ncol = 7)
-# 	ind <- category_purchases > 0
-# 	brand_loyalty[ind,] <- brand_purchases[ind, ] / category_purchases[ind]
-# 	brand_loyalty[!ind,] <- 1/7
-# 	colnames(brand_loyalty) <- paste(brand_names, "Loyalty", sep = "_")
-# 	return(data.frame(data, brand_loyalty))
-# }
-
 
 estimateBrandLoyalty <- function(data) {
-	# Only up to week 61 for calibration
+	rows <- nrow(data)
+	brand_loyalty <- matrix(0,  nrow = rows, ncol = brands)
+	
 	calibr <- which(data$Days <= 61 * 7)
-
-	for (id in unique(data$ID)) {
-		index <- which(data$ID == id)
-		brand_loyalty[index,] <- colSums(data[intersect(index, calibr), brand_names]) / sum(data[intersect(index, calibr), brand_names])
-	}
+	brand_loyalty <- matrix(rep(colSums(data[calibr, brand_names]) / sum(data[calibr, brand_names]), each = rows), rows, brands) 
+	colnames(brand_loyalty) <- paste(brand_names, "Loyalty", sep = "_")
 	
 	return(data.frame(data, brand_loyalty))
 }
 
 
 lastBrandPurchased <- function(data) {
+	
+	rows <- nrow(data)
+	LBP                 <- matrix(0,  nrow = rows, ncol = brands)
+	colnames(LBP)                 <- paste(brand_names, "LBP", sep = "_")
+	
 	last <- 0
 	
 	for (i in 1:rows) {
@@ -131,19 +133,21 @@ lastBrandPurchased <- function(data) {
 # Promotion ----
 hasReducedPrice <- function(data) {
 	
-	for (id in unique_id) {
-		index <- which(data$ID == id)
-		last <- numeric(brands)
+	rows <- nrow(data)
+	price_reduced <- matrix(0,  nrow = rows, ncol = brands)
+	colnames(price_reduced) <- paste(brand_names, "Pricecut", sep = "_")
+	
+	last <- numeric(brands)
 		
-		for (j in 1:length(index)) {
-			for (p in 1:brands) {
-				if (data[j, brand_price[p]] != 0) {
-					price_reduced[j,p] <- data[j, brand_price[p]] < last[p]
-					last[p] <- data[j, brand_price[p]]
-				}
+	for (i in 1:rows) {
+		for (p in 1:brands) {
+			if (data[i, brand_price[p]] != 0) {
+					price_reduced[i,p] <- data[i, brand_price[p]] < last[p]
+					last[p] <- data[i, brand_price[p]]
 			}
 		}
 	}
+	
 	return(data.frame(data, price_reduced))
 }
 

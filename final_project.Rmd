@@ -28,7 +28,46 @@ getStorePrices(kaffee) %>%
 
 
 ```{r}
-getPurchaseVolume(kaffee) %>% 
+getPurchaseVolume(kaffee2) %>% 
 	ggplot() + 
 	geom_smooth(aes(x = Days, y = Units, group = Brand, col = Brand), se = FALSE)
 ```
+
+
+
+
+```{r}
+model <- brandChoiceModel(kaffee2)
+res_bch <- optim(rep(0, 11), model, return.data = FALSE, control = list(maxit = 5e2), hessian = TRUE)
+
+res_bch$par + cbind(-qnorm(0.975) * sqrt(diag(res_bch$hessian)), 0, qnorm(0.975) * sqrt(diag(res_bch$hessian)))
+kaffee3 <- model(res_bch$par, return.data = TRUE)
+```
+
+```{r}
+model <- incidenceModel(kaffee3)
+res_pur <- optim(rep(0, 4), model, return.data = FALSE, control = list(maxit = 5e2))
+
+res_pur
+```
+
+```{r}
+model <- quantityModel(kaffee2)
+res_qty <- optim(rep(0, 12), model, return.data = FALSE, control = list(maxit = 5e2))
+
+res_qty
+```
+
+```{r}
+model <- jointModel(kaffee2)
+res_full <- optim(rep(0, 27), model, control = list(maxit = 5e2))
+
+res_full
+```
+
+```{r}
+model <- jointModelSegments(kaffee2, 2)
+res_seg <- optim(rep(0, 56), model)
+res_seg
+```
+

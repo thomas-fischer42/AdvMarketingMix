@@ -10,7 +10,7 @@ reorganizePars.combined <- function(pars) {
 
 jointModel <- function(data) {
 	
-	likelihood <- function(pars, return.model = FALSE) {
+	likelihood <- function(pars, return.data = FALSE) {
 		
 		pars <- reorganizePars.combined(pars)
 		
@@ -21,14 +21,16 @@ jointModel <- function(data) {
 		quantity <- quantityModel(data)
 		data <- quantity(pars[["Quantity"]])
 		
-		loglik <- sum(data[, c("LL_BCH", "LL_PUR", "LL_QTY")])
+		loglik <- rowSums(data[, c("LL_BCH", "LL_PUR", "LL_QTY")])
+		LL <- sum(loglik)
+
+		if (is.infinite(LL)) LL <- -1e100
 		
-		if (return.model) return(data)
-		return(-loglik)
+		if (return.data) {
+			return(data)
+		}
+		return(-LL)
 	}
 	return(likelihood)
 }
-
-# res <- optim(rep(0, 27), jointModel(kaffee), return.model = FALSE, control = list(maxit = 2e2))
-# res
 
