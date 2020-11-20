@@ -114,9 +114,9 @@ estimateBrandLoyalty <- function(data) {
 
 lastBrandPurchased <- function(data) {
 	
-	rows <- nrow(data)
-	LBP                 <- matrix(0,  nrow = rows, ncol = brands)
-	colnames(LBP)                 <- paste(brand_names, "LBP", sep = "_")
+	rows          <- nrow(data)
+	LBP           <- matrix(0,  nrow = rows, ncol = brands)
+	colnames(LBP) <- paste(brand_names, "LBP", sep = "_")
 	
 	last <- 0
 	
@@ -125,6 +125,7 @@ lastBrandPurchased <- function(data) {
 			LBP[i, data$Purchase_Brand[i]] <- data$Purchase_Brand[i] == last
 			last <- data$Purchase_Brand[i] 
 		}
+		LBP[i, last] <- 1
 	}
 	return(data.frame(data, LBP))
 }

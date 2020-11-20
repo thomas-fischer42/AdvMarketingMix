@@ -33,6 +33,7 @@ brandChoiceModel <- function(data) {
 			}
 		}
 		
+		utility <- utility * (mat[, paste(brand_names, "Price", sep = "_")] > 0)
 		cv <- log(rowSums(exp(utility)))
 		logprob_brandchoice <- log(exp(utility)/exp(cv))
 		loglik <- rowSums(logprob_brandchoice * mat[, brand_names])

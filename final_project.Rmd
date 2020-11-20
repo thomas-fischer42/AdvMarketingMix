@@ -22,8 +22,10 @@ source("code/08_segments.R")
 getStorePrices(kaffee) %>%
 	tidyr::pivot_longer(cols = ends_with("Price"), names_to = "Brand", values_to = "Price") %>% 
 	drop_duplicates() %>% 
+	filter(Price > 0) %>% 
 	ggplot() + 
-	geom_smooth(aes(x = Days, y = Price, group = Brand, col = Brand))
+	geom_line(aes(x = Days, y = Price, group = Brand, col = Brand)) + 
+	facet_wrap(~ID_Store)
 ```
 
 
@@ -38,36 +40,65 @@ getPurchaseVolume(kaffee2) %>%
 
 ```{r}
 model <- brandChoiceModel(kaffee2)
-res_bch <- optim(rep(0, 11), model, return.data = FALSE, control = list(maxit = 5e2), hessian = TRUE)
+res_bch <- optim(rep(0, 11), model, return.data = FALSE, control = list(maxit = 2e4), hessian = TRUE)
 
-res_bch$par + cbind(-qnorm(0.975) * sqrt(diag(res_bch$hessian)), 0, qnorm(0.975) * sqrt(diag(res_bch$hessian)))
+out_bch <- res_bch$par + cbind(
+	-qnorm(0.975) * (diag(res_bch$hessian)^-0.5), 0,
+	 qnorm(0.975) * (diag(res_bch$hessian))^-0.5)
+rownames(out_bch) <- c("Intercept", brand_names[-1], "Loyalty", "Last purchased", "Price", "Pricecut")
 kaffee3 <- model(res_bch$par, return.data = TRUE)
+round(out_bch,3)
 ```
 
 ```{r}
 model <- incidenceModel(kaffee3)
-res_pur <- optim(rep(0, 4), model, return.data = FALSE, control = list(maxit = 5e2))
+res_pur <- optim(rep(0, 4), model, return.data = FALSE, control = list(maxit = 2e4), hessian = TRUE)
 
-res_pur
+out_pur <- res_pur$par + cbind(
+	-qnorm(0.975) * sqrt(diag(res_pur$hessian)), 0, 
+	 qnorm(0.975) * sqrt(diag(res_pur$hessian)))
+rownames(out_pur) <- c("Intercept", "Avg Consumption", "Inventory", "Category value")
+round(out_pur,3)
 ```
 
 ```{r}
 model <- quantityModel(kaffee2)
-res_qty <- optim(rep(0, 12), model, return.data = FALSE, control = list(maxit = 5e2))
+res_qty <- optim(rep(0, 12), model, return.data = FALSE, control = list(maxit = 2e4), hessian = TRUE)
 
-res_qty
+out_qty <- res_qty$par + cbind(
+	-qnorm(0.975) * (diag(res_qty$hessian))^-0.5, 0, 
+	 qnorm(0.975) * (diag(res_qty$hessian))^-0.5)
+rownames(out_qty) <- c("Intercept", brand_names[-1], "PR", "Inventory", "Loyalty", "Price", "Pricecut")
+round(out_qty,3)
 ```
 
 ```{r}
+start_pars <- c(res_bch$par, res_pur$par, res_qty$par)
 model <- jointModel(kaffee2)
-res_full <- optim(rep(0, 27), model, control = list(maxit = 5e2))
+res_full <- optim(start_pars, model, control = list(maxit = 2e4), hessian = TRUE)
 
-res_full
+out_full <- res_full$par + cbind(
+	-qnorm(0.975) * (diag(res_full$hessian))^-0.5, 0, 
+	 qnorm(0.975) * (diag(res_full$hessian))^-0.5)
+rownames(out_full) <- c(paste("BCH", rownames(out_bch)), 
+												paste("PUR", rownames(out_pur)), 
+												paste("Qty", rownames(out_qty)))
+out_full
 ```
 
 ```{r}
+start_pars <- rep(c(0, res_full$par), 2)
 model <- jointModelSegments(kaffee2, 2)
-res_seg <- optim(rep(0, 56), model)
-res_seg
+res_seg <- optim(start_pars, model, control = list(maxit=2e4), hessian = TRUE, method = "CG")
+
+out_seg <- res_seg$par + cbind(
+	-qnorm(0.975) * (diag(res_seg$hessian))^-0.5, 0, 
+	 qnorm(0.975) * (diag(res_seg$hessian))^-0.5)
+
+rownames(out_seg) <- c("SEG1 Size", paste("SEG1", rownames(out_full)),
+											 "Seg2 Size", paste("SEG2", rownames(out_full)))
 ```
+
+
+
 

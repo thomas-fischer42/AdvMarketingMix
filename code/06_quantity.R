@@ -13,11 +13,11 @@ quantityModel <- function(data) {
 	# Pre-initialize containers ----
 	linpred             <- matrix(0,  nrow = rows, ncol = brands)
 	lambda              <- matrix(0, nrow = rows, ncol = brands)
-	logprob_quantity    <- matrix(0, nrow = rows, ncol = brands)
+	logprob             <- matrix(0, nrow = rows, ncol = brands)
 	loglik              <- numeric(rows)
 	
 	# Add names to containers ----
-	colnames(logprob_quantity) <- paste(brand_names, "LP_QTY", sep = "_")
+	colnames(logprob) <- paste(brand_names, "LP_QTY", sep = "_")
 
 	likelihood <- function(pars, return.data = TRUE) {
 		
@@ -34,8 +34,8 @@ quantityModel <- function(data) {
 		}
 		
 		lambda <- exp(linpred)
-		logprob_quantity <- log(dtruncpois(lambda, mat[, "Purchase_Quantity"]))
-		loglik <- rowSums(logprob_quantity * mat[, brand_names], na.rm = TRUE)
+		logprob <- log(dtruncpois(lambda, mat[, "Purchase_Quantity"]))
+		loglik <- rowSums(logprob * mat[, brand_names], na.rm = TRUE)
 		loglik[is.nan(loglik)] <- 0 # log(0) * 0
 		
 		LL <- sum(loglik)

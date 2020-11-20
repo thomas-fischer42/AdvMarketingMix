@@ -8,9 +8,10 @@ reorganizePars.incidence <- function(pars) {
 incidenceModel <- function(data) {
 	
 	unique_id <- unique(kaffee2$ID)
+	
 	# Pre-initialize containers ----
 	linpred             <- numeric(rows)
-	logprob_purchase    <- numeric(rows)
+	logprob             <- numeric(rows)
 	loglik              <- numeric(rows)
 	
 
@@ -25,8 +26,8 @@ incidenceModel <- function(data) {
 			linpred[index] <- pars[["Intercept"]] + mat[index, predictors] %*% pars[["Covariates"]]
 		}
 		
-		logprob_purchase <- log(expit(linpred))
-		loglik <- dbinom(rowSums(mat[, brand_names]), 1, exp(logprob_purchase), log = TRUE)
+		logprob <- log(expit(linpred))
+		loglik <- dbinom(rowSums(mat[, brand_names]), 1, exp(logprob), log = TRUE)
 		LL <- sum(loglik)
 
 		if (return.data) {
