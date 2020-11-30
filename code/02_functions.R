@@ -11,7 +11,6 @@
 ## ---------------------------
 
 
-# Variable transformation ----
 
 logit <- function(p) {
 	log(p) - log(1-p)
@@ -21,29 +20,16 @@ expit <- function(x) {
 	1/(1 + exp(-x))
 }
 
-dtruncpois <- function(lambda, quantity) {
-	exp(-lambda) * lambda^quantity / ((1-exp(-lambda))*factorial(quantity))
-}
-
-getStorePrices <- function(data, id = NULL) {
-	if (!is.null(id)) {
-		store_data <- drop_duplicates(subset(data, ID_Store == id, select = c("Days", brand_price)))
-	} else {
-		store_data <- drop_duplicates(subset(data, select = c("ID_Store", "Days", brand_price)))
+dtruncpois <- function(x, lambda, .log = FALSE) {
+	if (any(x %% 1 != 0)) {
+		warning("Non-integer input for x")
+		x <- floor(x)
 	}
-	return(store_data[order(store_data$Days),])
+	
+	if (.log) return( (-lambda)+log(lambda)*x - log((1-exp(-lambda))*factorial(x)) + log(x>0)) 
+	else return((exp(-lambda) * lambda^x / ((1-exp(-lambda))*factorial(x)))*(x > 0))
 }
 
-getPurchaseVolume <- function(data) {
-	tmp <- subset(data, Purchase_Quantity > 0, select = c("Days", "Purchase_Quantity", brand_names))
-	tmp[,brand_names] <- tmp[,brand_names] * tmp[,"Purchase_Quantity"]
-	
-	tmp[, c("Days", brand_names)] %>%
-		tidyr::pivot_longer(col = starts_with("Brand"), names_to = "Brand", values_to = "Units") %>%
-		group_by(Days, Brand) %>% 
-		summarise(across(.fns = sum)) %>% 
-		ungroup()
-}
 
 # Data wrangling ----
 
@@ -131,25 +117,24 @@ lastBrandPurchased <- function(data) {
 }
 
 
-# Promotion ----
-hasReducedPrice <- function(data) {
+basePrice <- function(data) {
 	
 	rows <- nrow(data)
-	price_reduced <- matrix(0,  nrow = rows, ncol = brands)
-	colnames(price_reduced) <- paste(brand_names, "Pricecut", sep = "_")
+	base_price <- matrix(0,  nrow = rows, ncol = brands)
+	price_cut <- matrix(0, nrow = rows, ncol = brands)
+	colnames(base_price) <- paste(brand_names, "Baseprice", sep = "_")
+	colnames(price_cut) <- paste(brand_names, "Pricecut", sep = "_")
 	
-	last <- numeric(brands)
-		
-	for (i in 1:rows) {
-		for (p in 1:brands) {
-			if (data[i, brand_price[p]] != 0) {
-					price_reduced[i,p] <- data[i, brand_price[p]] < last[p]
-					last[p] <- data[i, brand_price[p]]
-			}
-		}
+	for (p in 1:brands) {
+		tab <- table(data[, paste(brand_names[p], "Price", sep = "_")])
+		tab <- tab[names(tab) != "0"]
+		base_price[,p] <- as.numeric(names(tab[which.max(tab)]))
+		price_cut[,p] <- data[, paste(brand_names[p], "Price", sep = "_")] != 0 & 
+										 data[, paste(brand_names[p], "Price", sep = "_")] < base_price[,p]
 	}
-	
-	return(data.frame(data, price_reduced))
+	return(data.frame(data, base_price, price_cut))
 }
+
+
 
 

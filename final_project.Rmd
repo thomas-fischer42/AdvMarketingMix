@@ -10,22 +10,55 @@ knitr::opts_chunk$set(echo = TRUE)
 source("code/01_dependencies.R")
 source("code/02_functions.R")
 source("code/03_processing.R")
-source("code/04_brandchoice.R")
-source("code/05_incidence.R")
-source("code/06_quantity.R")
-source("code/07_combined.R")
-source("code/08_segments.R")
+source("code/04_basemodel.R")
+source("code/05_brandchoice.R")
+source("code/06_incidence.R")
+source("code/07_quantity.R")
+source("code/08_combined.R")
+source("code/09_segments.R")
+```
+
+
+# Remaining issues
+- Cannot calculate standard errors
+- Base price
+- Optimization is slow. Further room for improvement?
+  o Could limit analysis to sequential approach?
+
+
+```{r}
+bm <- base_model(kaffee2)
+m1 <- brandChoiceModel(bm)
+m2 <- incidenceModel(bm)
+m3 <- quantityModel(bm)
+m4 <- jointModel(bm)
+m5 <- jointModelSegments(bm, 2)
+
+optim_control <- list(maxit = 1e3)
+# res1 <- optim(rep(0, 10), m1, hessian = TRUE)
+# res2 <- optim(rep(0,  4), m2, method = "L-BFGS-B")
+# res3 <- optim(rep(0, 11), m3)
+# res4 <- optim(rep(0, 26), m4)
+res5 <- optim(rep(0, 54), m5, method = "L-BFGS-B", control = optim_control)
+
+sum(res1$hessian)
+
+library(numDeriv)
+
 ```
 
 
 ```{r}
 getStorePrices(kaffee) %>%
+	arrange(Days) %>% 
 	tidyr::pivot_longer(cols = ends_with("Price"), names_to = "Brand", values_to = "Price") %>% 
 	drop_duplicates() %>% 
-	filter(Price > 0) %>% 
+	filter(Price > 0) %>%
+	filter(Brand == "Brand_3_Price") %>% 
 	ggplot() + 
-	geom_line(aes(x = Days, y = Price, group = Brand, col = Brand)) + 
-	facet_wrap(~ID_Store)
+	geom_line(aes(x = Days, y = Price, group = ID_Store))
+
+
 ```
 
 
@@ -48,6 +81,11 @@ out_bch <- res_bch$par + cbind(
 rownames(out_bch) <- c("Intercept", brand_names[-1], "Loyalty", "Last purchased", "Price", "Pricecut")
 kaffee3 <- model(res_bch$par, return.data = TRUE)
 round(out_bch,3)
+
+kaffee3
+```
+```{r}
+res_bch
 ```
 
 ```{r}
@@ -99,6 +137,13 @@ rownames(out_seg) <- c("SEG1 Size", paste("SEG1", rownames(out_full)),
 											 "Seg2 Size", paste("SEG2", rownames(out_full)))
 ```
 
+```{r}
+library(microbenchmark)
+
+model <- quantityModel(kaffee2)
+
+microbenchmark(model(rep(0, 11)))
+```
 
 
 
